@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(
   request: NextRequest,
@@ -27,7 +27,7 @@ export async function POST(
 
     const { error: updateRoundError } = await supabase
       .from('rounds')
-      .update({ 
+      .update({
         status: 'finished',
         ended_at: new Date().toISOString()
       })
@@ -59,7 +59,7 @@ export async function POST(
 
       await supabase
         .from('rooms')
-        .update({ 
+        .update({
           current_round: nextRoundNumber,
           updated_at: new Date().toISOString()
         })
@@ -76,7 +76,7 @@ export async function POST(
     } else {
       await supabase
         .from('rooms')
-        .update({ 
+        .update({
           status: 'finished',
           updated_at: new Date().toISOString()
         })

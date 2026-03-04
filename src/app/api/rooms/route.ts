@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,12 +12,13 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionId = crypto.randomUUID()
+    const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase()
 
     const { data: room, error: roomError } = await supabase
       .from('rooms')
       .insert({
         host_id: sessionId,
-        code: null,
+        code: roomCode,
         max_players: maxPlayers,
         total_rounds: totalRounds,
         time_per_round: timePerRound,
@@ -28,16 +29,7 @@ export async function POST(request: NextRequest) {
 
     if (roomError) throw roomError
 
-    const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase()
-
-    const { data: updatedRoom, error: updateError } = await supabase
-      .from('rooms')
-      .update({ code: roomCode })
-      .eq('id', room.id)
-      .select()
-      .single()
-
-    if (updateError) throw updateError
+    const updatedRoom = room
 
     const { data: player, error: playerError } = await supabase
       .from('players')

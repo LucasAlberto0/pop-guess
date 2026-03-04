@@ -188,3 +188,15 @@ CREATE TRIGGER room_updated_at
   BEFORE UPDATE ON rooms
   FOR EACH ROW
   EXECUTE FUNCTION update_room_timestamp();
+  
+-- Aggressive Realtime enablement
+-- 1. Recreate the publication to include all tables automatically
+DROP PUBLICATION IF EXISTS supabase_realtime;
+CREATE PUBLICATION supabase_realtime FOR ALL TABLES;
+
+-- 2. Set replica identity to FULL for tables that need real-time updates
+-- This ensures all columns are available in the payload
+ALTER TABLE rooms REPLICA IDENTITY FULL;
+ALTER TABLE players REPLICA IDENTITY FULL;
+ALTER TABLE rounds REPLICA IDENTITY FULL;
+ALTER TABLE round_answers REPLICA IDENTITY FULL;

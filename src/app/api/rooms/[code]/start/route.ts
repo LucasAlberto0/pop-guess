@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 
 const SAMPLE_IMAGES = [
   { url: 'https://picsum.photos/seed/movie1/800/600', answer: 'The Matrix', hints: ['Filme de ficção científica', 'Pílula vermelha ou azul'] },
@@ -69,7 +69,7 @@ export async function POST(
 
     const { error: updateRoomError } = await supabase
       .from('rooms')
-      .update({ 
+      .update({
         status: 'playing',
         current_round: 1,
         updated_at: new Date().toISOString()
@@ -92,9 +92,9 @@ export async function POST(
       .eq('round_number', 1)
       .single()
 
-    return NextResponse.json({ 
-      success: true, 
-      round: firstRound 
+    return NextResponse.json({
+      success: true,
+      round: firstRound
     })
   } catch (error) {
     console.error('Error starting game:', error)

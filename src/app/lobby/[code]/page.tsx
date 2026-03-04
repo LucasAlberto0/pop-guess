@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ParticleBackground from "@/components/game/ParticleBackground";
 import { Copy, Check, Crown, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 function LobbyContent() {
   const router = useRouter();
@@ -19,12 +19,12 @@ function LobbyContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const fetchRoom = async () => {
       try {
-        const res = await fetch(`/api/rooms/${code}`);
+        const res = await fetch(`/api/rooms/${code}?t=${Date.now()}`);
         const data = await res.json();
         
         if (data.error) {
@@ -58,7 +58,7 @@ function LobbyContent() {
           filter: `room_id=eq.${room.id}`,
         },
         async () => {
-          const res = await fetch(`/api/rooms/${code}`);
+          const res = await fetch(`/api/rooms/${code}?t=${Date.now()}`);
           const data = await res.json();
           setPlayers(data.players || []);
         }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(
   request: NextRequest,
@@ -27,7 +27,7 @@ export async function POST(
 
     await supabase
       .from('rooms')
-      .update({ 
+      .update({
         status: 'finished',
         updated_at: new Date().toISOString()
       })
@@ -39,7 +39,7 @@ export async function POST(
       .eq('room_id', room.id)
       .order('score', { ascending: false })
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       finalRanking: finalPlayers
     })
