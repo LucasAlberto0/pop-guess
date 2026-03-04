@@ -12,12 +12,7 @@ interface ChatMessage {
   isSystem?: boolean;
 }
 
-const mockMessages: ChatMessage[] = [
-  { id: "1", sender: "Sistema", text: "A rodada começou!", timestamp: "00:01", isSystem: true },
-  { id: "2", sender: "Luna", text: "essa é fácil!", timestamp: "00:03" },
-  { id: "3", sender: "Blaze", text: "hmm 🤔", timestamp: "00:05" },
-  { id: "4", sender: "Sistema", text: "Luna acertou! +150 pontos", timestamp: "00:06", isSystem: true },
-];
+const mockMessages: ChatMessage[] = [];
 
 const ChatPanel = () => {
   const [messages, setMessages] = useState(mockMessages);

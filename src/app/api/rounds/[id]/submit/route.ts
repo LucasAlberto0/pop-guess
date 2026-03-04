@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(
   request: NextRequest,
@@ -7,7 +7,7 @@ export async function POST(
 ) {
   try {
     const { id: roundId } = await params
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const body = await request.json()
     const { playerId, playerSessionId, answer, timeMs } = body
 
@@ -114,7 +114,7 @@ export async function GET(
 ) {
   try {
     const { id: roundId } = await params
-    const supabase = createClient()
+    const supabase = createAdminClient()
 
     const { data: answers, error } = await supabase
       .from('round_answers')
@@ -130,3 +130,4 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch answers' }, { status: 500 })
   }
 }
+

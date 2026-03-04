@@ -13,7 +13,7 @@ CREATE TABLE rooms (
   max_players INTEGER DEFAULT 16 CHECK (max_players >= 2 AND max_players <= 16),
   current_round INTEGER DEFAULT 0,
   total_rounds INTEGER DEFAULT 10,
-  time_per_round INTEGER DEFAULT 30,
+  time_per_round INTEGER DEFAULT 20,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -40,6 +40,7 @@ CREATE TABLE rounds (
   room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
   round_number INTEGER NOT NULL,
   image_url TEXT NOT NULL,
+  question TEXT,
   answer VARCHAR(200) NOT NULL,
   answer_hints TEXT[] DEFAULT '{}',
   status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'finished')),
@@ -130,7 +131,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Function to calculate points based on time
-CREATE OR REPLACE FUNCTION calculate_points(time_ms INTEGER, time_limit_ms INTEGER DEFAULT 30000)
+CREATE OR REPLACE FUNCTION calculate_points(time_ms INTEGER, time_limit_ms INTEGER DEFAULT 20000)
 RETURNS INTEGER AS $$
 DECLARE
   base_points INTEGER := 1000;

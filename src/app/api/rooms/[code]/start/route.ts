@@ -1,17 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const SAMPLE_IMAGES = [
-  { url: 'https://picsum.photos/seed/movie1/800/600', answer: 'The Matrix', hints: ['Filme de ficção científica', 'Pílula vermelha ou azul'] },
-  { url: 'https://picsum.photos/seed/music1/800/600', answer: 'Bohemian Rhapsody', hints: ['MúsicaQueen', 'Opera rock'] },
-  { url: 'https://picsum.photos/seed/series1/800/600', answer: 'Breaking Bad', hints: ['Série sobre química', 'Walter White'] },
-  { url: 'https://picsum.photos/seed/game1/800/600', answer: 'Super Mario', hints: ['Jogo Nintendo', 'Encanador italiano'] },
-  { url: 'https://picsum.photos/seed/artist1/800/600', answer: 'Michael Jackson', hints: ['Rei do Pop', 'Moonwalk'] },
-  { url: 'https://picsum.photos/seed/movie2/800/600', answer: 'Titanic', hints: ['Navio afundado', 'Jack e Rose'] },
-  { url: 'https://picsum.photos/seed/music2/800/600', answer: 'Billie Jean', hints: ['Michael Jackson', 'Lua de Billie Jean'] },
-  { url: 'https://picsum.photos/seed/series2/800/600', answer: 'Stranger Things', hints: ['Netflix', ' mundo invertido'] },
-  { url: 'https://picsum.photos/seed/game2/800/600', answer: 'Pokemon', hints: ['Pocket Monsters', 'Ash Ketchum'] },
-  { url: 'https://picsum.photos/seed/artist2/800/600', answer: 'Taylor Swift', hints: ['Cantora country pop', 'Red (Taylor\'s Version)'] },
+  {
+    url: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&q=80&w=800',
+    question: 'Quem é esse icônico professor de química transformado em mestre do crime?',
+    answer: 'Walter White',
+    hints: ['Breaking Bad', 'Heisenberg']
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=800',
+    question: 'Em que filme acompanhamos Neo na descoberta de que o mundo é uma simulação?',
+    answer: 'The Matrix',
+    hints: ['Pílula vermelha ou azul', 'Keanu Reeves']
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1585951237318-9ea5e175b891?auto=format&fit=crop&q=80&w=800',
+    question: 'Qual o nome desse personagem da Nintendo conhecido por salvar a Princesa Peach?',
+    answer: 'Super Mario',
+    hints: ['Encanador italiano', 'Cogumelos']
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=800',
+    question: 'Qual é o nome do navio inafundável que protagoniza um dos maiores épicos do cinema?',
+    answer: 'Titanic',
+    hints: ['Jack e Rose', 'Iceberg']
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&fit=crop&q=80&w=800',
+    question: 'Quem é conhecido mundialmente como o Rei do Pop e criador do Moonwalk?',
+    answer: 'Michael Jackson',
+    hints: ['Thriller', 'Billie Jean']
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=800',
+    question: 'Qual o nome da série da Netflix que explora o Mundo Invertido nos anos 80?',
+    answer: 'Stranger Things',
+    hints: ['Eleven', 'Demogorgon']
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?auto=format&fit=crop&q=80&w=800',
+    question: 'Quem é o super-herói amigo da vizinhança que usa um traje vermelho e azul?',
+    answer: 'Homem-Aranha',
+    hints: ['Peter Parker', 'Marvel']
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1605462863863-10d9e47e15ee?auto=format&fit=crop&q=80&w=800',
+    question: 'Qual o nome do bruxo mais famoso de Hogwarts?',
+    answer: 'Harry Potter',
+    hints: ['O Menino que Sobreviveu', 'Gryffindor']
+  },
 ]
 
 export async function POST(
@@ -20,7 +58,7 @@ export async function POST(
 ) {
   try {
     const { code } = await params
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const body = await request.json()
     const { sessionId } = body
 
@@ -56,6 +94,7 @@ export async function POST(
       room_id: room.id,
       round_number: index + 1,
       image_url: img.url,
+      question: img.question,
       answer: img.answer,
       answer_hints: img.hints,
       status: 'pending'
@@ -65,18 +104,40 @@ export async function POST(
       .from('rounds')
       .insert(roundsData)
 
-    if (roundsError) throw roundsError
+    if (roundsError) {
+      console.error('Database Error (Rounds Table):', roundsError)
+      if (roundsError.message.includes('column "question" does not exist')) {
+        return NextResponse.json({
+          error: 'Database schema out of sync. Please run the SQL migration.',
+          details: 'Column "question" is missing in "rounds" table.'
+        }, { status: 500 })
+      }
+      throw roundsError
+    }
 
     const { error: updateRoomError } = await supabase
       .from('rooms')
       .update({
         status: 'playing',
         current_round: 1,
+        time_per_round: 20,
         updated_at: new Date().toISOString()
       })
       .eq('id', room.id)
 
     if (updateRoomError) throw updateRoomError
+
+    // Activate the first round with a timestamp
+    const { error: activateRoundError } = await supabase
+      .from('rounds')
+      .update({
+        status: 'active',
+        started_at: new Date().toISOString()
+      })
+      .eq('room_id', room.id)
+      .eq('round_number', 1)
+
+    if (activateRoundError) throw activateRoundError
 
     const { error: updatePlayersError } = await supabase
       .from('players')
@@ -96,8 +157,11 @@ export async function POST(
       success: true,
       round: firstRound
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error starting game:', error)
-    return NextResponse.json({ error: 'Failed to start game' }, { status: 500 })
+    return NextResponse.json({
+      error: 'Failed to start game',
+      details: error?.message || 'Unknown error'
+    }, { status: 500 })
   }
 }

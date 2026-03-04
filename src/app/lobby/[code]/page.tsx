@@ -1,74 +1,30 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useMemo, Suspense, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import ParticleBackground from "@/components/game/ParticleBackground";
 import { Copy, Check, Crown, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { useRealtimeRoom } from "@/hooks/useRealtimeRoom";
 
 function LobbyContent() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const isHost = searchParams.get("host") === "true";
   const code = params.code as string;
+  const isHost = searchParams.get("host") === "true";
+  
+  const { room, players, isLoading: initialLoading } = useRealtimeRoom(code);
   const [copied, setCopied] = useState(false);
-  const [players, setPlayers] = useState<any[]>([]);
-  const [room, setRoom] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState("");
-  const supabase = useMemo(() => createClient(), []);
 
+  // Redirect when game starts
   useEffect(() => {
-    const fetchRoom = async () => {
-      try {
-        const res = await fetch(`/api/rooms/${code}?t=${Date.now()}`);
-        const data = await res.json();
-        
-        if (data.error) {
-          setError(data.error);
-          return;
-        }
-
-        setRoom(data.room);
-        setPlayers(data.players || []);
-      } catch (err) {
-        setError("Erro ao carregar sala");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRoom();
-  }, [code]);
-
-  useEffect(() => {
-    if (!room?.id) return;
-
-    const channel = supabase
-      .channel(`lobby:${room.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "players",
-          filter: `room_id=eq.${room.id}`,
-        },
-        async () => {
-          const res = await fetch(`/api/rooms/${code}?t=${Date.now()}`);
-          const data = await res.json();
-          setPlayers(data.players || []);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [room?.id, code]);
+    if (room?.status === 'playing') {
+      router.push(`/game/${code}`);
+    }
+  }, [room?.status, code, router]);
 
   const copyCode = () => {
     navigator.clipboard.writeText(code || "");
@@ -101,7 +57,7 @@ function LobbyContent() {
     }
   };
 
-  if (isLoading) {
+  if (initialLoading) {
     return (
       <div className="relative min-h-screen gradient-bg-animated flex items-center justify-center">
         <ParticleBackground />

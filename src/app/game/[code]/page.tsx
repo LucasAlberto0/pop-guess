@@ -1,25 +1,21 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import TimerRing from "@/components/game/TimerRing";
 import RankingList from "@/components/game/RankingList";
 import ChatPanel from "@/components/game/ChatPanel";
 import { Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase";
+import { useRealtimeRoom } from "@/hooks/useRealtimeRoom";
 
 function GameContent() {
   const router = useRouter();
   const params = useParams();
   const code = params.code as string;
-  const [room, setRoom] = useState<any>(null);
-  const [currentRound, setCurrentRound] = useState<any>(null);
-  const [players, setPlayers] = useState<any[]>([]);
-  const [answers, setAnswers] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [timeLeft, setTimeLeft] = useState(30);
+  const { room, players, currentRound, answers, isLoading: initialLoading } = useRealtimeRoom(code);
+  const [isHost, setIsHost] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(20);
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
   const [answered, setAnswered] = useState(false);
@@ -27,119 +23,106 @@ function GameContent() {
   const [scorePopup, setScorePopup] = useState<number | null>(null);
   const [roundResult, setRoundResult] = useState<any>(null);
   const startTimeRef = useRef<number>(0);
-  const supabase = createClient();
 
   useEffect(() => {
-    const fetchGameData = async () => {
-      try {
-        const res = await fetch(`/api/rooms/${code}`);
-        const data = await res.json();
-        
-        if (data.error) {
-          setError(data.error);
-          return;
-        }
-
-        setRoom(data.room);
-        setPlayers(data.players || []);
-        
-        if (data.currentRound) {
-          setCurrentRound(data.currentRound);
-          setTimeLeft(data.room.time_per_round || 30);
-          startTimeRef.current = Date.now();
-        }
-      } catch (err) {
-        setError("Erro ao carregar jogo");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchGameData();
-  }, [code]);
-
-  useEffect(() => {
-    if (!room?.id) return;
-
-    const channel = supabase
-      .channel(`game:${room.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "rooms",
-          filter: `id=eq.${room.id}`,
-        },
-        async (payload: any) => {
-          if (payload.new?.status === "finished") {
-            router.push(`/results/${code}`);
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "players",
-          filter: `room_id=eq.${room.id}`,
-        },
-        async () => {
-          const res = await fetch(`/api/rooms/${code}`);
-          const data = await res.json();
-          setPlayers(data.players || []);
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "rounds",
-          filter: `room_id=eq.${room.id}`,
-        },
-        async (payload: any) => {
-          if (payload.new?.status === "active" && !currentRound) {
-            const res = await fetch(`/api/rooms/${code}`);
-            const data = await res.json();
-            setCurrentRound(data.currentRound);
-            setTimeLeft(data.room.time_per_round || 30);
-            startTimeRef.current = Date.now();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [room?.id, code, router]);
-
-  useEffect(() => {
-    if (answered || showRoundResult || !currentRound || timeLeft <= 0) return;
-
-    if (timeLeft <= 0) {
-      handleTimeUp();
-      return;
+    if (room) {
+      const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
+      setIsHost(room.host_id === playerData.sessionId);
     }
+  }, [room]);
 
-    const timer = setTimeout(() => setTimeLeft((p) => p - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [timeLeft, answered, showRoundResult, currentRound]);
+  useEffect(() => {
+    if (room?.status === 'finished') {
+      router.push(`/results/${code}`);
+    }
+  }, [room?.status, code, router]);
+
+
+  useEffect(() => {
+    if (!currentRound || showRoundResult || timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      if (currentRound && currentRound.started_at) {
+        const serverStart = new Date(currentRound.started_at).getTime();
+        const now = Date.now();
+        const elapsed = Math.floor((now - serverStart) / 1000);
+        const limit = room?.time_per_round || 20;
+        const remaining = Math.max(0, limit - elapsed);
+        
+        setTimeLeft(remaining);
+        
+        if (remaining === 0 && !showRoundResult) {
+          handleTimeUp();
+        }
+      }
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, [currentRound, room?.time_per_round, showRoundResult]);
+
+  useEffect(() => {
+    if (currentRound) {
+      if (currentRound.status === "finished") {
+        const handleFinishedRound = async () => {
+          try {
+            const res = await fetch(`/api/rounds/${currentRound.id}/finish`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId: JSON.parse(sessionStorage.getItem("player") || "{}").sessionId }),
+            });
+            const data = await res.json();
+            
+            setRoundResult(data);
+            setShowRoundResult(true);
+
+            if (isHost) {
+              setTimeout(async () => {
+                const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
+                await fetch(`/api/rounds/${currentRound.id}/next`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ sessionId: playerData.sessionId }),
+                });
+              }, 5000);
+            }
+          } catch (err) {
+            console.error("Error handling round finish:", err);
+          }
+        };
+        
+        if (!showRoundResult) {
+           handleFinishedRound();
+        }
+        
+      } else if (currentRound.status === "active" && currentRound.id !== roundResult?.round?.id) {
+        setTimeLeft(room?.time_per_round || 20);
+        setAnswer("");
+        setFeedback(null);
+        setAnswered(false);
+        setShowRoundResult(false);
+        setRoundResult(null);
+        startTimeRef.current = Date.now();
+      }
+    }
+  }, [currentRound, isHost, room?.time_per_round, showRoundResult, roundResult?.round?.id]);
+
 
   const handleTimeUp = async () => {
-    if (!answered) {
-      setAnswered(true);
-      setFeedback("wrong");
-      await finishRound();
+    if (isHost && currentRound && !showRoundResult) {
+      const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
+      await fetch(`/api/rounds/${currentRound.id}/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: playerData.sessionId }),
+      });
     }
+    // Non-hosts just wait for the Realtime 'finished' event
   };
 
   const submitAnswer = async () => {
-    if (!answer.trim() || answered || !currentRound) return;
+    if (!answer.trim() || answered || !currentRound || showRoundResult) return;
 
-    const timeMs = Date.now() - startTimeRef.current;
+    const timeMs = Date.now() - new Date(currentRound.started_at!).getTime();
     setAnswered(true);
 
     const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
@@ -151,7 +134,7 @@ function GameContent() {
         body: JSON.stringify({
           playerId: playerData.id,
           playerSessionId: playerData.sessionId,
-          answer: answer,
+          answer: answer.trim(),
           timeMs,
         }),
       });
@@ -164,103 +147,21 @@ function GameContent() {
         setTimeout(() => setScorePopup(null), 800);
       } else {
         setFeedback("wrong");
+        setAnswered(false); // Allow multiple tries
       }
-
-      await finishRound();
     } catch (err) {
       setFeedback("wrong");
-      await finishRound();
+      setAnswered(false);
     }
   };
 
-  const finishRound = async () => {
-    if (!currentRound) return;
 
-    const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
-
-    try {
-      const res = await fetch(`/api/rounds/${currentRound.id}/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: playerData.sessionId }),
-      });
-
-      const data = await res.json();
-      
-      setRoundResult(data);
-      setShowRoundResult(true);
-
-      if (data.gameFinished) {
-        setTimeout(() => {
-          router.push(`/results/${code}`);
-        }, 3000);
-      } else if (data.nextRound) {
-        setTimeout(() => {
-          setCurrentRound(data.nextRound);
-          setTimeLeft(room?.time_per_round || 30);
-          setAnswer("");
-          setFeedback(null);
-          setAnswered(false);
-          setShowRoundResult(false);
-          setRoundResult(null);
-          startTimeRef.current = Date.now();
-        }, 3000);
-      }
-    } catch (err) {
-      console.error("Error finishing round:", err);
-    }
-  };
-
-  const nextRound = async () => {
-    if (!currentRound || !room) return;
-
-    const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
-
-    try {
-      const res = await fetch(`/api/rounds/${currentRound.id}/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: playerData.sessionId }),
-      });
-
-      const data = await res.json();
-      
-      if (data.nextRound) {
-        setCurrentRound(data.nextRound);
-        setTimeLeft(room.time_per_round || 30);
-        setAnswer("");
-        setFeedback(null);
-        setAnswered(false);
-        setShowRoundResult(false);
-        setRoundResult(null);
-        startTimeRef.current = Date.now();
-      } else if (data.gameFinished) {
-        router.push(`/results/${code}`);
-      }
-    } catch (err) {
-      console.error("Error going to next round:", err);
-    }
-  };
-
-  if (isLoading) {
+  if (initialLoading) {
     return (
       <div className="relative min-h-screen gradient-bg-animated flex items-center justify-center">
         <div className="flex items-center gap-2 text-primary font-display text-xl">
           <Loader2 className="animate-spin" />
           Carregando jogo...
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="relative min-h-screen gradient-bg-animated flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 font-display text-xl mb-4">{error}</p>
-          <button onClick={() => router.push("/")} className="btn-neon px-6 py-3 rounded-xl">
-            Voltar
-          </button>
         </div>
       </div>
     );
@@ -298,8 +199,15 @@ function GameContent() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 1.05 }}
-                  className="glass-card p-2 max-w-lg w-full"
+                  className="glass-card p-2 max-w-lg w-full flex flex-col gap-4"
                 >
+                  {(currentRound as any).question && (
+                    <div className="px-4 py-2 bg-primary/10 rounded-lg border border-primary/20">
+                      <p className="font-display text-sm sm:text-base text-primary text-center">
+                        {(currentRound as any).question}
+                      </p>
+                    </div>
+                  )}
                   <img
                     src={currentRound.image_url}
                     alt="Quiz"

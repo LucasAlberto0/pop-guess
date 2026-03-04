@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/client"
 import type { Room, Player, Round, RoundAnswer } from "@/types/database"
 
 type RealtimeEvent = {
@@ -25,7 +25,7 @@ export function useRealtimeRoom(roomCode: string) {
 
     const fetchInitialData = async () => {
       setIsLoading(true)
-      
+
       const { data: roomData } = await supabase
         .from("rooms")
         .select("*")
@@ -116,6 +116,33 @@ export function useRealtimeRoom(roomCode: string) {
       supabase.removeChannel(playersSubscription)
     }
   }, [roomCode])
+
+  useEffect(() => {
+    if (room?.id && room.current_round > 0) {
+      if (!currentRound || currentRound.round_number !== room.current_round) {
+        const fetchNewRound = async () => {
+          const { data: roundData } = await supabase
+            .from("rounds")
+            .select("*")
+            .eq("room_id", room.id)
+            .eq("round_number", room.current_round)
+            .single()
+
+          if (roundData) {
+            setCurrentRound(roundData)
+            const { data: answersData } = await supabase
+              .from("round_answers")
+              .select("*")
+              .eq("round_id", roundData.id)
+              .order("time_ms", { ascending: true })
+
+            setAnswers(answersData || [])
+          }
+        }
+        fetchNewRound()
+      }
+    }
+  }, [room?.current_round, room?.id, currentRound?.round_number])
 
   useEffect(() => {
     if (!currentRound) return

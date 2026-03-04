@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
     const body = await request.json()
-    const { hostName, hostAvatar, maxPlayers = 16, totalRounds = 10, timePerRound = 30 } = body
+    const { hostName, hostAvatar, maxPlayers = 16, totalRounds = 10, timePerRound = 20 } = body
 
     if (!hostName?.trim()) {
       return NextResponse.json({ error: 'Host name is required' }, { status: 400 })
