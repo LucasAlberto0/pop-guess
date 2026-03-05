@@ -63,12 +63,13 @@ export async function POST(
     let newStreak = player.streak
 
     if (isCorrect) {
-      const basePoints = 1000
-      const timeBonus = Math.max(0, Math.floor((round.room.time_per_round * 1000 - timeMs) * 2 / 1000))
-      pointsEarned = basePoints + timeBonus
+      // Points from 1 to 10 based on speed
+      // 10 points if timeMs is 0 (immediate)
+      // 1 point if timeMs is equal to timeLimit (last second)
+      const timeLimitMs = round.room.time_per_round * 1000
+      const speedRatio = Math.max(0, Math.min(1, timeMs / timeLimitMs))
+      pointsEarned = Math.max(1, Math.min(10, Math.round(1 + 9 * (1 - speedRatio))))
       newStreak = player.streak + 1
-      const streakBonus = newStreak * 50
-      pointsEarned += streakBonus
     } else {
       newStreak = 0
     }

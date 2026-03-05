@@ -88,7 +88,9 @@ export async function POST(
     }
 
     const shuffledImages = [...SAMPLE_IMAGES].sort(() => Math.random() - 0.5)
-    const roundsToCreate = shuffledImages.slice(0, room.total_rounds)
+    // Create more rounds initially (at least 20 or all available images)
+    const numRounds = Math.min(20, shuffledImages.length)
+    const roundsToCreate = shuffledImages.slice(0, numRounds)
 
     const roundsData = roundsToCreate.map((img, index) => ({
       room_id: room.id,
@@ -106,12 +108,6 @@ export async function POST(
 
     if (roundsError) {
       console.error('Database Error (Rounds Table):', roundsError)
-      if (roundsError.message.includes('column "question" does not exist')) {
-        return NextResponse.json({
-          error: 'Database schema out of sync. Please run the SQL migration.',
-          details: 'Column "question" is missing in "rounds" table.'
-        }, { status: 500 })
-      }
       throw roundsError
     }
 
@@ -120,6 +116,7 @@ export async function POST(
       .update({
         status: 'playing',
         current_round: 1,
+        total_rounds: 100, // Effectively unlimited for now
         time_per_round: 20,
         updated_at: new Date().toISOString()
       })
@@ -136,6 +133,8 @@ export async function POST(
       })
       .eq('room_id', room.id)
       .eq('round_number', 1)
+
+    if (activateRoundError) throw activateRoundError
 
     if (activateRoundError) throw activateRoundError
 

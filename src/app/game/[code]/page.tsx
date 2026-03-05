@@ -48,9 +48,9 @@ function GameContent() {
         const elapsed = Math.floor((now - serverStart) / 1000);
         const limit = room?.time_per_round || 20;
         const remaining = Math.max(0, limit - elapsed);
-        
+
         setTimeLeft(remaining);
-        
+
         if (remaining === 0 && !showRoundResult) {
           handleTimeUp();
         }
@@ -71,7 +71,7 @@ function GameContent() {
               body: JSON.stringify({ sessionId: JSON.parse(sessionStorage.getItem("player") || "{}").sessionId }),
             });
             const data = await res.json();
-            
+
             setRoundResult(data);
             setShowRoundResult(true);
 
@@ -89,11 +89,11 @@ function GameContent() {
             console.error("Error handling round finish:", err);
           }
         };
-        
+
         if (!showRoundResult) {
-           handleFinishedRound();
+          handleFinishedRound();
         }
-        
+
       } else if (currentRound.status === "active" && currentRound.id !== roundResult?.round?.id) {
         setTimeLeft(room?.time_per_round || 20);
         setAnswer("");
@@ -140,7 +140,7 @@ function GameContent() {
       });
 
       const data = await res.json();
-      
+
       if (data.isCorrect) {
         setFeedback("correct");
         setScorePopup(data.pointsEarned);
@@ -184,8 +184,8 @@ function GameContent() {
         <div className="flex-1 flex flex-col p-4 lg:p-6 min-w-0">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <span className="font-display text-xs text-primary tracking-widest">
-                RODADA {currentRound.round_number}/{room?.total_rounds || 10}
+              <span className="font-display text-xs text-primary tracking-widest uppercase">
+                Rodada {currentRound.round_number}
               </span>
             </div>
             <TimerRing timeLeft={timeLeft} totalTime={room?.time_per_round || 30} />
@@ -238,7 +238,9 @@ function GameContent() {
                     </div>
                   )}
                   <p className="text-sm text-muted-foreground font-ui mb-6">
-                    {roundResult?.gameFinished ? "Finalizando jogo..." : "Próxima rodada em breve..."}
+                    {roundResult?.gameFinished
+                      ? `🏆 ${roundResult?.winner?.name || "Alguém"} venceu o jogo!`
+                      : "Próxima rodada em breve..."}
                   </p>
                 </motion.div>
               )}
@@ -270,13 +272,12 @@ function GameContent() {
                 onKeyDown={(e) => e.key === "Enter" && submitAnswer()}
                 placeholder="Sua resposta..."
                 disabled={answered}
-                className={`flex-1 bg-input border rounded-xl px-4 py-3 font-body text-foreground placeholder:text-muted-foreground focus:outline-none transition-all ${
-                  feedback === "correct"
-                    ? "border-neon-green neon-border-cyan"
-                    : feedback === "wrong"
+                className={`flex-1 bg-input border rounded-xl px-4 py-3 font-body text-foreground placeholder:text-muted-foreground focus:outline-none transition-all ${feedback === "correct"
+                  ? "border-neon-green neon-border-cyan"
+                  : feedback === "wrong"
                     ? "border-destructive"
                     : "border-border focus:neon-border-cyan"
-                } disabled:opacity-50`}
+                  } disabled:opacity-50`}
               />
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -296,9 +297,8 @@ function GameContent() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className={`text-center text-sm font-ui mt-2 ${
-                  feedback === "correct" ? "text-neon-green" : "text-destructive"
-                }`}
+                className={`text-center text-sm font-ui mt-2 ${feedback === "correct" ? "text-neon-green" : "text-destructive"
+                  }`}
               >
                 {feedback === "correct" ? "✅ Acertou!" : "❌ Errou!"}
               </motion.p>
@@ -311,7 +311,7 @@ function GameContent() {
             <RankingList players={players} currentPlayerId={JSON.parse(sessionStorage.getItem("player") || "{}").id || ""} />
           </div>
           <div className="flex-1 min-h-0">
-            <ChatPanel />
+            <ChatPanel roomCode={code} />
           </div>
         </div>
       </div>

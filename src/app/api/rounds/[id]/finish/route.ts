@@ -49,12 +49,16 @@ export async function POST(
       .eq('room_id', round.room.id)
       .order('score', { ascending: false })
 
+    const winner = players?.find(p => p.score >= 120)
+
     return NextResponse.json({
       success: true,
       roundFinished: round.round_number,
       correctAnswer: round.answer,
       answers: answers || [],
-      ranking: players || []
+      ranking: players || [],
+      gameFinished: !!winner,
+      winner: winner || null
     })
   } catch (error) {
     console.error('Error finishing round:', error)

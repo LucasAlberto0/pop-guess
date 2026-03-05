@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { Room, Player, Round, RoundAnswer } from "@/types/database"
 
@@ -18,14 +18,13 @@ export function useRealtimeRoom(roomCode: string) {
   const [answers, setAnswers] = useState<RoundAnswer[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     if (!roomCode) return
 
-    const fetchInitialData = async () => {
+    const fetchRoomData = async () => {
       setIsLoading(true)
-
       const { data: roomData } = await supabase
         .from("rooms")
         .select("*")
@@ -34,41 +33,11 @@ export function useRealtimeRoom(roomCode: string) {
 
       if (roomData) {
         setRoom(roomData)
-
-        const { data: playersData } = await supabase
-          .from("players")
-          .select("*")
-          .eq("room_id", roomData.id)
-          .order("player_order", { ascending: true })
-
-        setPlayers(playersData || [])
-
-        if (roomData.current_round > 0) {
-          const { data: roundData } = await supabase
-            .from("rounds")
-            .select("*")
-            .eq("room_id", roomData.id)
-            .eq("round_number", roomData.current_round)
-            .single()
-
-          if (roundData) {
-            setCurrentRound(roundData)
-
-            const { data: answersData } = await supabase
-              .from("round_answers")
-              .select("*")
-              .eq("round_id", roundData.id)
-              .order("time_ms", { ascending: true })
-
-            setAnswers(answersData || [])
-          }
-        }
       }
-
       setIsLoading(false)
     }
 
-    fetchInitialData()
+    fetchRoomData()
 
     const roomSubscription = supabase
       .channel(`room:${roomCode}`)
@@ -88,61 +57,82 @@ export function useRealtimeRoom(roomCode: string) {
       )
       .subscribe()
 
+    return () => {
+      supabase.removeChannel(roomSubscription)
+    }
+  }, [roomCode])
+
+  useEffect(() => {
+    if (!room?.id) return
+
+    const fetchPlayersData = async () => {
+      const { data: playersData } = await supabase
+        .from("players")
+        .select("*")
+        .eq("room_id", room.id)
+        .order("player_order", { ascending: true })
+
+      setPlayers(playersData || [])
+    }
+
+    fetchPlayersData()
+
     const playersSubscription = supabase
-      .channel(`players:${roomCode}`)
+      .channel(`players:${room.id}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "players",
+          filter: `room_id=eq.${room.id}`,
         },
-        async (payload) => {
-          if (room) {
-            const { data } = await supabase
-              .from("players")
-              .select("*")
-              .eq("room_id", room.id)
-              .order("player_order", { ascending: true })
+        async () => {
+          const { data } = await supabase
+            .from("players")
+            .select("*")
+            .eq("room_id", room.id!)
+            .order("player_order", { ascending: true })
 
-            setPlayers(data || [])
-          }
+          setPlayers(data || [])
         }
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(roomSubscription)
       supabase.removeChannel(playersSubscription)
     }
-  }, [roomCode])
+  }, [room?.id, supabase])
 
   useEffect(() => {
-    if (room?.id && room.current_round > 0) {
-      if (!currentRound || currentRound.round_number !== room.current_round) {
-        const fetchNewRound = async () => {
-          const { data: roundData } = await supabase
-            .from("rounds")
-            .select("*")
-            .eq("room_id", room.id)
-            .eq("round_number", room.current_round)
-            .single()
+    if (!room?.id || room.current_round === 0) return
 
-          if (roundData) {
-            setCurrentRound(roundData)
-            const { data: answersData } = await supabase
-              .from("round_answers")
-              .select("*")
-              .eq("round_id", roundData.id)
-              .order("time_ms", { ascending: true })
+    // Only fetch if we don't have the round or it's a new round
+    if (currentRound && currentRound.round_number === room.current_round) return
 
-            setAnswers(answersData || [])
-          }
-        }
-        fetchNewRound()
+    const fetchRoundData = async () => {
+      const { data: roundData } = await supabase
+        .from("rounds")
+        .select("*")
+        .eq("room_id", room.id)
+        .eq("round_number", room.current_round)
+        .single()
+
+      if (roundData) {
+        setCurrentRound(roundData)
+
+        const { data: answersData } = await supabase
+          .from("round_answers")
+          .select("*")
+          .eq("round_id", roundData.id)
+          .order("time_ms", { ascending: true })
+
+        setAnswers(answersData || [])
       }
     }
-  }, [room?.current_round, room?.id, currentRound?.round_number])
+
+    fetchRoundData()
+  }, [room?.id, room?.current_round, currentRound?.round_number])
 
   useEffect(() => {
     if (!currentRound) return
