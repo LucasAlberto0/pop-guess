@@ -82,30 +82,77 @@ export async function POST(
             // In a real app we'd fetch from a large pool, for now we reuse SAMPLE_IMAGES but random
             // This is a simple fallback
             const SAMPLE_IMAGES = [
-                { url: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&q=80&w=800', answer: 'Walter White' },
-                { url: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=800', answer: 'The Matrix' },
-                { url: 'https://images.unsplash.com/photo-1585951237318-9ea5e175b891?auto=format&fit=crop&q=80&w=800', answer: 'Super Mario' },
-                { url: 'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=800', answer: 'Titanic' },
-                { url: 'https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&fit=crop&q=80&w=800', answer: 'Michael Jackson' },
-                { url: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=800', answer: 'Stranger Things' },
-                { url: 'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?auto=format&fit=crop&q=80&w=800', answer: 'Homem-Aranha' },
-                { url: 'https://images.unsplash.com/photo-1605462863863-10d9e47e15ee?auto=format&fit=crop&q=80&w=800', answer: 'Harry Potter' },
+                { url: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&q=80&w=800', answer: 'Walter White', question: 'Quem é esse icônico professor?', hints: ['Breaking Bad'] },
+                { url: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=800', answer: 'The Matrix', question: 'Qual o nome desse filme?', hints: ['Neo'] },
+                { url: 'https://images.unsplash.com/photo-1585951237318-9ea5e175b891?auto=format&fit=crop&q=80&w=800', answer: 'Super Mario', question: 'Qual o nome desse personagem?', hints: ['Nintendo'] },
+                { url: 'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=800', answer: 'Titanic', question: 'Qual o nome do navio?', hints: ['Iceberg'] },
+                { url: 'https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&fit=crop&q=80&w=800', answer: 'Michael Jackson', question: 'Quem é o Rei do Pop?', hints: ['Moonwalk'] },
+                { url: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=800', answer: 'Stranger Things', question: 'Qual o nome da série?', hints: ['Netflix'] },
+                { url: 'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?auto=format&fit=crop&q=80&w=800', answer: 'Homem-Aranha', question: 'Qual o nome desse herói?', hints: ['Marvel'] },
+                { url: 'https://images.unsplash.com/photo-1605462863863-10d9e47e15ee?auto=format&fit=crop&q=80&w=800', answer: 'Harry Potter', question: 'Qual o nome desse bruxo?', hints: ['Hogwarts'] },
             ]
-            const randomImg = SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)]
+            // 1. Fetch used question texts/answers to avoid duplicates
+            const { data: usedRounds } = await supabase
+                .from('rounds')
+                .select('answer, question')
+                .eq('room_id', currentRound.room.id)
 
-            const { data } = await supabase
+            const usedQuestions = usedRounds?.map(r => r.answer) || []
+
+            // 2. Fetch a random new question from the pool
+            let nextQuestion = null
+            try {
+                const { data: poolData } = await supabase
+                    .from('question_pool')
+                    .select('*')
+                    .not('primary_answer', 'in', `(${usedQuestions.map(a => `"${a}"`).join(',')})`)
+                    .limit(10)
+
+                if (poolData && poolData.length > 0) {
+                    // Pick one randomly from the small set
+                    nextQuestion = poolData[Math.floor(Math.random() * poolData.length)]
+                }
+            } catch (e) {
+                console.error('Error fetching next question from pool:', e)
+            }
+
+            // 3. Map to round format (fallback to SAMPLE if pool fails)
+            const newRoundData = nextQuestion
+                ? {
+                    url: nextQuestion.image_url || '',
+                    question: nextQuestion.question,
+                    answer: nextQuestion.primary_answer,
+                    hints: nextQuestion.hints || []
+                }
+                : SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)]
+
+            const { data: newRound, error: createError } = await supabase
                 .from('rounds')
                 .insert({
                     room_id: currentRound.room.id,
-                    round_number: nextRoundNumber,
-                    image_url: randomImg.url,
-                    answer: randomImg.answer,
+                    round_number: currentRound.room.current_round + 1,
+                    image_url: newRoundData.url,
+                    question: newRoundData.question,
+                    answer: newRoundData.answer,
+                    answer_hints: newRoundData.hints,
                     status: 'active',
                     started_at: new Date().toISOString()
                 })
                 .select()
                 .single()
-            nextRound = data
+
+            if (createError) throw createError
+
+            // Update room to the new round
+            await supabase.from('rooms').update({
+                current_round: currentRound.room.current_round + 1,
+                updated_at: new Date().toISOString()
+            }).eq('id', currentRound.room.id)
+
+            return NextResponse.json({
+                success: true,
+                nextRound: newRound
+            })
         }
 
         if (!nextRound) throw new Error('Failed to create or find next round')

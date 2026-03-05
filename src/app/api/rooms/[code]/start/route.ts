@@ -87,18 +87,42 @@ export async function POST(
       return NextResponse.json({ error: 'Need at least 2 players to start' }, { status: 400 })
     }
 
-    const shuffledImages = [...SAMPLE_IMAGES].sort(() => Math.random() - 0.5)
-    // Create more rounds initially (at least 20 or all available images)
-    const numRounds = Math.min(20, shuffledImages.length)
-    const roundsToCreate = shuffledImages.slice(0, numRounds)
+    // 1. Fetch random questions from the Supabase Pool
+    let poolQuestions = []
+    try {
+      const { data: poolData, error: poolError } = await supabase
+        .from('question_pool')
+        .select('*')
 
-    const roundsData = roundsToCreate.map((img, index) => ({
+      if (!poolError && poolData && poolData.length > 0) {
+        poolQuestions = poolData.sort(() => Math.random() - 0.5)
+      }
+    } catch (e) {
+      console.error('Error fetching from question_pool:', e)
+    }
+
+    // 2. Use pool questions or fallback to SAMPLE_IMAGES
+    const sourceQuestions = poolQuestions.length > 0
+      ? poolQuestions.map(q => ({
+        url: q.image_url || '',
+        question: q.question,
+        answer: q.primary_answer,
+        hints: q.hints || [],
+        alternative_answers: q.alternative_answers || []
+      }))
+      : SAMPLE_IMAGES.sort(() => Math.random() - 0.5)
+
+    // Create more rounds initially (at least 20 or all available)
+    const numRounds = Math.min(20, sourceQuestions.length)
+    const roundsToCreate = sourceQuestions.slice(0, numRounds)
+
+    const roundsData = roundsToCreate.map((q, index) => ({
       room_id: room.id,
       round_number: index + 1,
-      image_url: img.url,
-      question: img.question,
-      answer: img.answer,
-      answer_hints: img.hints,
+      image_url: q.url || '', // Can be empty for text rounds
+      question: q.question,
+      answer: q.answer,
+      answer_hints: q.hints,
       status: 'pending'
     }))
 
@@ -116,7 +140,7 @@ export async function POST(
       .update({
         status: 'playing',
         current_round: 1,
-        total_rounds: 100, // Effectively unlimited for now
+        total_rounds: 100, // Unlimited rounds basically
         time_per_round: 20,
         updated_at: new Date().toISOString()
       })
@@ -133,8 +157,6 @@ export async function POST(
       })
       .eq('room_id', room.id)
       .eq('round_number', 1)
-
-    if (activateRoundError) throw activateRoundError
 
     if (activateRoundError) throw activateRoundError
 

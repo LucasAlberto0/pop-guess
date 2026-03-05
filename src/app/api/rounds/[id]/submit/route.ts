@@ -57,8 +57,14 @@ export async function POST(
 
     const normalizedAnswer = answer.toLowerCase().trim()
     const normalizedCorrect = round.answer.toLowerCase().trim()
-    const isCorrect = normalizedAnswer === normalizedCorrect ||
-      normalizedCorrect.includes(normalizedAnswer) && normalizedAnswer.length > 3
+
+    // Check main answer and all alternative variants in answer_hints
+    const variants = [normalizedCorrect, ...(round.answer_hints || []).map((h: string) => h.toLowerCase().trim())]
+
+    const isCorrect = variants.some(v =>
+      normalizedAnswer === v ||
+      (v.includes(normalizedAnswer) && normalizedAnswer.length > 3)
+    )
 
     let pointsEarned = 0
     let newStreak = player.streak
