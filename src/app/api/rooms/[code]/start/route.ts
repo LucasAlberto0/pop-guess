@@ -6,49 +6,57 @@ const SAMPLE_IMAGES = [
     url: 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?auto=format&fit=crop&q=80&w=800',
     question: 'Quem é esse icônico professor de química transformado em mestre do crime?',
     answer: 'Walter White',
-    hints: ['Breaking Bad', 'Heisenberg']
+    hints: ['Breaking Bad', 'Heisenberg'],
+    alternative_answers: [] as string[]
   },
   {
     url: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=800',
     question: 'Em que filme acompanhamos Neo na descoberta de que o mundo é uma simulação?',
     answer: 'The Matrix',
-    hints: ['Pílula vermelha ou azul', 'Keanu Reeves']
+    hints: ['Pílula vermelha ou azul', 'Keanu Reeves'],
+    alternative_answers: [] as string[]
   },
   {
     url: 'https://images.unsplash.com/photo-1585951237318-9ea5e175b891?auto=format&fit=crop&q=80&w=800',
     question: 'Qual o nome desse personagem da Nintendo conhecido por salvar a Princesa Peach?',
     answer: 'Super Mario',
-    hints: ['Encanador italiano', 'Cogumelos']
+    hints: ['Encanador italiano', 'Cogumelos'],
+    alternative_answers: [] as string[]
   },
   {
     url: 'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=800',
     question: 'Qual é o nome do navio inafundável que protagoniza um dos maiores épicos do cinema?',
     answer: 'Titanic',
-    hints: ['Jack e Rose', 'Iceberg']
+    hints: ['Jack e Rose', 'Iceberg'],
+    alternative_answers: [] as string[]
   },
   {
     url: 'https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?auto=format&fit=crop&q=80&w=800',
     question: 'Quem é conhecido mundialmente como o Rei do Pop e criador do Moonwalk?',
     answer: 'Michael Jackson',
-    hints: ['Thriller', 'Billie Jean']
+    hints: ['Thriller', 'Billie Jean'],
+    alternative_answers: [] as string[]
   },
   {
     url: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=800',
     question: 'Qual o nome da série da Netflix que explora o Mundo Invertido nos anos 80?',
     answer: 'Stranger Things',
-    hints: ['Eleven', 'Demogorgon']
+    hints: ['Eleven', 'Demogorgon'],
+    alternative_answers: [] as string[]
   },
   {
     url: 'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?auto=format&fit=crop&q=80&w=800',
     question: 'Quem é o super-herói amigo da vizinhança que usa um traje vermelho e azul?',
     answer: 'Homem-Aranha',
-    hints: ['Peter Parker', 'Marvel']
+    hints: ['Peter Parker', 'Marvel'],
+    alternative_answers: [] as string[]
   },
   {
     url: 'https://images.unsplash.com/photo-1605462863863-10d9e47e15ee?auto=format&fit=crop&q=80&w=800',
     question: 'Qual o nome do bruxo mais famoso de Hogwarts?',
     answer: 'Harry Potter',
-    hints: ['O Menino que Sobreviveu', 'Gryffindor']
+    hints: ['O Menino que Sobreviveu', 'Gryffindor'],
+    alternative_answers: [] as string[]
   },
 ]
 
@@ -60,7 +68,7 @@ export async function POST(
     const { code } = await params
     const supabase = createAdminClient()
     const body = await request.json()
-    const { sessionId } = body
+    const { sessionId, maxScore, difficulty, timePerRound } = body
 
     const { data: room, error: roomError } = await supabase
       .from('rooms')
@@ -90,9 +98,14 @@ export async function POST(
     // 1. Fetch random questions from the Supabase Pool
     let poolQuestions = []
     try {
-      const { data: poolData, error: poolError } = await supabase
-        .from('question_pool')
-        .select('*')
+      let query = supabase.from('question_pool').select('*')
+      
+      // Filter by difficulty if it's set and not "all"
+      if (difficulty && difficulty !== 'all') {
+        query = query.eq('difficulty', difficulty)
+      }
+
+      const { data: poolData, error: poolError } = await query
 
       if (!poolError && poolData && poolData.length > 0) {
         poolQuestions = poolData.sort(() => Math.random() - 0.5)
@@ -122,7 +135,7 @@ export async function POST(
       image_url: q.url || '', // Can be empty for text rounds
       question: q.question,
       answer: q.answer,
-      answer_hints: q.hints,
+      answer_hints: [...(q.hints || []), ...(q.alternative_answers || [])],
       status: 'pending'
     }))
 
@@ -141,7 +154,9 @@ export async function POST(
         status: 'playing',
         current_round: 1,
         total_rounds: 100, // Unlimited rounds basically
-        time_per_round: 20,
+        time_per_round: timePerRound || 20,
+        max_score: maxScore || 120,
+        difficulty: difficulty || 'all',
         updated_at: new Date().toISOString()
       })
       .eq('id', room.id)

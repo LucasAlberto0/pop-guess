@@ -55,15 +55,26 @@ export async function POST(
       return NextResponse.json({ error: 'Already answered correctly' }, { status: 400 })
     }
 
-    const normalizedAnswer = answer.toLowerCase().trim()
-    const normalizedCorrect = round.answer.toLowerCase().trim()
+    const normalizeStr = (str: string) => {
+      return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // remove accents
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s]/g, ""); // remove punctuation
+    }
+
+    const normalizedAnswer = normalizeStr(answer)
+    const normalizedCorrect = normalizeStr(round.answer)
 
     // Check main answer and all alternative variants in answer_hints
-    const variants = [normalizedCorrect, ...(round.answer_hints || []).map((h: string) => h.toLowerCase().trim())]
+    const variants = [normalizedCorrect, ...(round.answer_hints || []).map((h: string) => normalizeStr(h))]
 
     const isCorrect = variants.some(v =>
       normalizedAnswer === v ||
-      (v.includes(normalizedAnswer) && normalizedAnswer.length > 3)
+      // Allows abbreviations such as 'ps2' to match correctly, and checks if user answer is at least 3 chars contained in correct
+      (v.length > 3 && v.includes(normalizedAnswer) && normalizedAnswer.length >= 3) ||
+      (normalizedAnswer === v.replace(/\s/g, '')) // E.g., match "ps2" if variant is "ps 2"
     )
 
     let pointsEarned = 0

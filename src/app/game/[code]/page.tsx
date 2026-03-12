@@ -26,6 +26,7 @@ function GameContent() {
   const [resultCountdown, setResultCountdown] = useState<number | null>(null);
   const startTimeRef = useRef<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const audioPlayedRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (showRoundResult && (resultCountdown === null || resultCountdown === 0)) {
@@ -89,9 +90,21 @@ function GameContent() {
       if (currentRound && currentRound.started_at) {
         const serverStart = new Date(currentRound.started_at).getTime();
         const now = Date.now();
-        const elapsed = Math.floor((now - serverStart) / 1000);
+        let elapsedSeconds = Math.floor((now - serverStart) / 1000);
+        
+        // Offset 7 seconds for round 1 due to Pre-Game Countdown (6 to 0, plus 1s showing JÁ)
+        if (currentRound.round_number === 1) {
+          elapsedSeconds -= 7;
+        }
+
         const limit = room?.time_per_round || 20;
-        const remaining = Math.max(0, limit - elapsed);
+
+        if (elapsedSeconds < 0) {
+          setTimeLeft(limit);
+          return;
+        }
+
+        const remaining = Math.max(0, limit - elapsedSeconds);
 
         setTimeLeft(remaining);
 
@@ -146,6 +159,7 @@ function GameContent() {
         setShowRoundResult(false);
         setRoundResult(null);
         startTimeRef.current = Date.now();
+        audioPlayedRef.current = false;
       }
     }
   }, [currentRound, isHost, room?.time_per_round, showRoundResult, roundResult?.round?.id]);
@@ -166,7 +180,12 @@ function GameContent() {
   const submitAnswer = async () => {
     if (!answer.trim() || answered || !currentRound || showRoundResult) return;
 
-    const timeMs = Date.now() - new Date(currentRound.started_at!).getTime();
+    let startTimeRound = new Date(currentRound.started_at!).getTime();
+    if (currentRound.round_number === 1) {
+      startTimeRound += 7000;
+    }
+    const timeMs = Math.max(0, Date.now() - startTimeRound);
+    
     setAnswered(true);
 
     const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
@@ -203,6 +222,13 @@ function GameContent() {
     }
   };
 
+  useEffect(() => {
+    if (feedback === "correct" && !showRoundResult && !audioPlayedRef.current) {
+       audioPlayedRef.current = true;
+       const audio = new Audio('/sounds/msn.mp3?v=2');
+       audio.play().catch(e => console.log("Audio play prevented:", e));
+    }
+  }, [feedback, showRoundResult]);
 
   if (initialLoading) {
     return (
@@ -236,7 +262,7 @@ function GameContent() {
                 Rodada {currentRound.round_number}
               </span>
               <span className="font-display text-sm font-black gradient-text">
-                ALVO: 120 PTS
+                ALVO: {room?.max_score || 120} PTS
               </span>
             </div>
             <TimerRing timeLeft={timeLeft} totalTime={room?.time_per_round || 30} />
@@ -252,16 +278,18 @@ function GameContent() {
                   exit={{ opacity: 0 }}
                   className="absolute inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-sm rounded-2xl overflow-hidden"
                 >
-                  <motion.div
-                    key={`count-${preGameCountdown}`}
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: 1.2, opacity: 1 }}
-                    transition={{ type: "spring", damping: 12, stiffness: 200 }}
+                  <div
                     className="flex flex-col items-center gap-4"
                   >
-                    <span className="font-display text-[120px] font-black gradient-text drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                    <motion.span
+                      key={`count-${preGameCountdown}`}
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1.2, opacity: 1 }}
+                      transition={{ type: "spring", damping: 12, stiffness: 200 }}
+                      className="font-display text-[120px] font-black gradient-text drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                    >
                       {preGameCountdown === 0 ? "JÁ!" : preGameCountdown}
-                    </span>
+                    </motion.span>
                     <motion.p
                       initial={{ y: 20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
@@ -269,7 +297,7 @@ function GameContent() {
                     >
                       Prepare-se
                     </motion.p>
-                  </motion.div>
+                  </div>
                 </motion.div>
               ) : null}
 
@@ -283,24 +311,33 @@ function GameContent() {
                     }`}
                 >
                   {(currentRound as any).question && (
-                    <div className="px-4 py-2 bg-primary/10 rounded-lg border border-primary/20">
-                      <p className="font-display text-sm sm:text-base text-primary text-center">
+                    <div className={`px-4 py-6 bg-primary/10 rounded-lg border border-primary/20 relative ${!currentRound.image_url ? "min-h-[16rem] flex items-center justify-center" : ""}`}>
+                      <p className={`font-display text-primary text-center ${!currentRound.image_url ? "text-xl sm:text-3xl font-bold" : "text-sm sm:text-base"}`}>
                         {(currentRound as any).question}
                       </p>
+                      
+                      {!currentRound.image_url && preGameCountdown !== null && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-lg backdrop-blur-sm">
+                          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                        </div>
+                      )}
                     </div>
                   )}
-                  <div className="relative overflow-hidden rounded-lg group">
-                    <img
-                      src={currentRound.image_url}
-                      alt="Quiz"
-                      className="w-full h-48 sm:h-64 lg:h-80 object-cover"
-                    />
-                    {preGameCountdown !== null && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-primary/5">
-                        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                      </div>
-                    )}
-                  </div>
+                  
+                  {currentRound.image_url && (
+                    <div className="relative overflow-hidden rounded-lg group bg-white p-2 sm:p-4">
+                      <img
+                        src={currentRound.image_url}
+                        alt="Quiz"
+                        className="w-full h-48 sm:h-64 lg:h-[28rem] object-contain"
+                      />
+                      {preGameCountdown !== null && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div
@@ -409,7 +446,7 @@ function GameContent() {
 
         <div className="w-full lg:w-80 flex flex-col gap-3 p-4 lg:p-6 lg:border-l border-border overflow-y-auto">
           <div className="flex-1 min-h-0">
-            <RankingList players={players} answers={answers} currentPlayerId={JSON.parse(sessionStorage.getItem("player") || "{}").id || ""} />
+            <RankingList players={players} answers={answers} currentPlayerId={JSON.parse(sessionStorage.getItem("player") || "{}").id || ""} maxScore={room?.max_score || 120} />
           </div>
           <div className="flex-1 min-h-0">
             <ChatPanel roomCode={code} />

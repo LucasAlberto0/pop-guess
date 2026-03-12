@@ -11,6 +11,8 @@ export interface Room {
   current_round: number
   total_rounds: number
   time_per_round: number
+  max_score?: number
+  difficulty?: string
   created_at: string
   updated_at: string
 }

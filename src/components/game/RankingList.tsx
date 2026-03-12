@@ -8,16 +8,17 @@ interface RankingListProps {
   players: Player[];
   currentPlayerId?: string;
   answers: RoundAnswer[];
+  maxScore: number;
 }
 
-const RankingList = ({ players, currentPlayerId, answers }: RankingListProps) => {
+const RankingList = ({ players, currentPlayerId, answers, maxScore }: RankingListProps) => {
   const sorted = [...players].sort((a, b) => b.score - a.score);
 
   return (
     <div className="glass-card p-4 space-y-2 h-full overflow-y-auto">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-display text-xs tracking-widest text-primary uppercase">Ranking</h3>
-        <span className="text-[10px] font-display font-medium text-muted-foreground/60">ALVO: 120 PTS</span>
+        <span className="text-[10px] font-display font-medium text-muted-foreground/60">ALVO: {maxScore} PTS</span>
       </div>
       <motion.div className="space-y-2">
         {sorted.map((player, i) => {

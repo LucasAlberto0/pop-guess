@@ -49,7 +49,8 @@ export async function POST(
       .eq('room_id', round.room.id)
       .order('score', { ascending: false })
 
-    const winner = players?.find(p => p.score >= 120)
+    const maxScore = round.room.max_score || 120
+    const winner = players?.find(p => p.score >= maxScore)
 
     return NextResponse.json({
       success: true,

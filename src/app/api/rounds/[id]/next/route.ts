@@ -122,9 +122,10 @@ export async function POST(
                     url: nextQuestion.image_url || '',
                     question: nextQuestion.question,
                     answer: nextQuestion.primary_answer,
-                    hints: nextQuestion.hints || []
+                    hints: nextQuestion.hints || [],
+                    alternative_answers: nextQuestion.alternative_answers || []
                 }
-                : SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)]
+                : { ...SAMPLE_IMAGES[Math.floor(Math.random() * SAMPLE_IMAGES.length)], alternative_answers: [] }
 
             const { data: newRound, error: createError } = await supabase
                 .from('rounds')
@@ -134,7 +135,7 @@ export async function POST(
                     image_url: newRoundData.url,
                     question: newRoundData.question,
                     answer: newRoundData.answer,
-                    answer_hints: newRoundData.hints,
+                    answer_hints: [...newRoundData.hints, ...(newRoundData.alternative_answers || [])],
                     status: 'active',
                     started_at: new Date().toISOString()
                 })
