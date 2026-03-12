@@ -12,6 +12,7 @@ interface PlayerCardProps {
   highlight?: boolean;
   isCorrect?: boolean;
   lastGuess?: string;
+  isSpectator?: boolean;
 }
 
 const rankColors = [
@@ -29,7 +30,8 @@ const PlayerCard = ({
   isCurrentPlayer,
   highlight,
   isCorrect,
-  lastGuess
+  lastGuess,
+  isSpectator
 }: PlayerCardProps) => {
   return (
     <motion.div
@@ -37,7 +39,7 @@ const PlayerCard = ({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       className={`flex items-center gap-3 p-3 rounded-lg transition-all ${isCurrentPlayer ? "bg-primary/10 border border-primary/30" : "glass-card bg-background/40"
-        } ${highlight ? "neon-border-magenta" : ""} ${isCorrect ? "border-neon-green/40 shadow-[0_0_10px_rgba(57,255,20,0.1)]" : ""}`}
+        } ${highlight ? "neon-border-magenta" : ""} ${isCorrect ? "border-neon-green/40 shadow-[0_0_10px_rgba(57,255,20,0.1)]" : ""} ${isSpectator ? "opacity-60 saturate-50" : ""}`}
     >
       <div className="relative">
         <div className={`w-12 h-12 rounded-lg ${isCorrect ? "bg-neon-green/10" : "bg-muted/30"} flex items-center justify-center text-2xl overflow-hidden border border-border/50`}>
@@ -49,7 +51,7 @@ const PlayerCard = ({
         </div>
         <span className={`absolute -bottom-1.5 -right-1.5 text-[10px] font-display font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-background shadow-lg bg-gradient-to-br ${rank <= 3 ? rankColors[rank - 1] : "from-muted-foreground to-muted"
           } text-background`}>
-          {rank}
+          {isSpectator ? "👁️" : rank}
         </span>
       </div>
 
@@ -84,8 +86,8 @@ const PlayerCard = ({
       </div>
 
       <div className="flex flex-col items-end gap-0">
-        <span className={`font-display text-base font-black ${isCorrect ? "text-neon-green" : "text-primary"} drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
-          {score}
+        <span className={`font-display text-base font-black ${isCorrect ? "text-neon-green" : isSpectator ? "text-muted-foreground/40" : "text-primary"} drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
+          {isSpectator ? "OBS" : score}
         </span>
       </div>
     </motion.div>

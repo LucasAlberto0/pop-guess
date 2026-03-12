@@ -13,12 +13,17 @@ O jogo foi feito para ser ágil, competitivo e sem "spoilers visuais". Os jogado
 
 ---
 
-## 📸 2. Regras Rígidas Para Imagens
+## 📸 2. Regras Rígidas Para Imagens (ATENÇÃO, PARA DIFICULTAR O JOGO)
 
-1. **Evite Capas e Pôsteres:** Nunca use capas de filmes ou séries caso elas contenham o logotipo do logo ou do filme, entregando a resposta.
-2. **Priorize *"Frames / Backdrops"***: Para filmes e séries, use um screenshot limpo de uma cena marcante que *indique* qual é a obra (Ex: Jim Halpert olhando para a câmera na série *The Office* ou o cenário de Tatooine em *Star Wars*).
-3. **Imagens de Pessoas/Celebridades/Atletas:** Use avatares, fotos em shows (sem texto grande), fotos em coletivas ou recortes de Wikipedia de alta qualidade.
-4. **Sem "Pistas Escritas":** Se uma cena animada ou de jogo tiver legendas grandes entregando a resposta, procure outra foto.
+1. **PROIBIDO Capas e Pôsteres Oficiais:** Nunca, sob nenhuma hipótese, use imagens promocionais, capas de filmes/séries que contenham o **logotipo ou o título da obra escrito**. Isso entrega a resposta de bandeja (Ex: Uma foto de Supernatural gigante escrito "Supernatural").
+2. **Prioridade MÁXIMA para *"Frames / Backdrops"***: Para filmes, séries e animes, **SEMPRE** pesquise e utilize um *screenshot* de uma cena do meio do episódio. O *background* perfeito é focado no ambiente e em um objeto ou em um enquadramento menos óbvio do personagem (Ex: Apenas as costas de um personagem icônico ou a arma no chão).
+3. **Pergunta Genérica:** Ao atrelar um frame de cena, a pergunta deve ser intencionalmente genérica para forçar a pessoa a olhar a imagem. Use formulações do tipo:
+   - *"De qual série foi tirada essa imagem/cena?"*
+   - *"A qual obra este ambiente/frame pertence?"* 
+   - *"Essa cena intensa aconteceu em qual anime?"*
+   - Não escreva o enredo na pergunta quando tiver imagem. A imagem é o desafio primário.
+4. **Imagens de Pessoas/Celebridades/Atletas:** Use avatares, fotos em shows (sem texto grande), fotos em coletivas ou recortes de Wikipedia de alta qualidade.
+5. **Sem "Pistas Escritas":** Se uma cena animada ou de jogo tiver legendas grandes entregando a resposta, procure outra foto.
 
 ---
 

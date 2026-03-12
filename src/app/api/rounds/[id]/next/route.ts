@@ -102,15 +102,16 @@ export async function POST(
             // 2. Fetch a random new question from the pool
             let nextQuestion = null
             try {
-                const { data: poolData } = await supabase
+                const { data: poolData, error: poolError } = await supabase
                     .from('question_pool')
-                    .select('*')
-                    .not('primary_answer', 'in', `(${usedQuestions.map(a => `"${a}"`).join(',')})`)
-                    .limit(10)
+                    .select('*');
+
+                if (poolError) throw poolError;
 
                 if (poolData && poolData.length > 0) {
-                    // Pick one randomly from the small set
-                    nextQuestion = poolData[Math.floor(Math.random() * poolData.length)]
+                    const unused = poolData.filter((q: any) => !usedQuestions.includes(q.primary_answer));
+                    const listToPickFrom = unused.length > 0 ? unused : poolData;
+                    nextQuestion = listToPickFrom[Math.floor(Math.random() * listToPickFrom.length)];
                 }
             } catch (e) {
                 console.error('Error fetching next question from pool:', e)

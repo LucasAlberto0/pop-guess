@@ -25,6 +25,7 @@ const RankingList = ({ players, currentPlayerId, answers, maxScore }: RankingLis
           const playerAnswers = answers.filter(a => a.player_id === player.id);
           const correctAnswer = playerAnswers.find(a => a.is_correct);
           const lastGuess = playerAnswers[playerAnswers.length - 1]?.answer;
+          const isSpectator = player.status === 'ready';
 
           return (
             <PlayerCard
@@ -37,6 +38,7 @@ const RankingList = ({ players, currentPlayerId, answers, maxScore }: RankingLis
               responseTime={correctAnswer ? (correctAnswer.time_ms / 1000).toFixed(3) : undefined}
               lastGuess={!correctAnswer && lastGuess ? lastGuess : undefined}
               isCurrentPlayer={player.id === currentPlayerId}
+              isSpectator={isSpectator}
             />
           );
         })}

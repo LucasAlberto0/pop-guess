@@ -28,6 +28,12 @@ function GameContent() {
   const inputRef = useRef<HTMLInputElement>(null);
   const audioPlayedRef = useRef<boolean>(false);
 
+  const [isJoining, setIsJoining] = useState(false);
+
+  const playerData = typeof window !== 'undefined' ? JSON.parse(sessionStorage.getItem("player") || "{}") : {};
+  const currentPlayer = players.find(p => p.id === playerData.id);
+  const spectatorMode = currentPlayer?.status === 'ready';
+
   useEffect(() => {
     if (showRoundResult && (resultCountdown === null || resultCountdown === 0)) {
       setResultCountdown(10);
@@ -212,13 +218,18 @@ function GameContent() {
         setFeedback("wrong");
         setAnswered(false);
         setAnswer(""); // Clear for another try
-        inputRef.current?.focus();
+        // Use a small timeout to ensure React has re-enabled the input
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 10);
       }
     } catch (err) {
       setFeedback("wrong");
       setAnswered(false);
       setAnswer("");
-      inputRef.current?.focus();
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 10);
     }
   };
 
@@ -405,7 +416,32 @@ function GameContent() {
             </AnimatePresence>
           </div>
 
-          {!showRoundResult && (
+          {!showRoundResult && spectatorMode ? (
+            <div className="flex justify-center mt-4">
+              <motion.button
+                 whileHover={{ scale: 1.05 }}
+                 whileTap={{ scale: 0.95 }}
+                 disabled={isJoining}
+                 onClick={async () => {
+                    setIsJoining(true);
+                    try {
+                      const playerData = JSON.parse(sessionStorage.getItem("player") || "{}");
+                      await fetch(`/api/players/${currentPlayer.id}/participate`, {
+                         method: 'POST',
+                         headers: { "Content-Type": "application/json" },
+                         body: JSON.stringify({ sessionId: playerData.sessionId })
+                      });
+                    } finally {
+                      setIsJoining(false);
+                    }
+                 }}
+                 className="btn-neon-magenta px-10 py-4 rounded-xl text-primary-foreground font-display tracking-widest uppercase shadow-lg shadow-magenta/20 flex items-center gap-3 disabled:opacity-50"
+              >
+                 {isJoining ? <Loader2 className="animate-spin w-5 h-5" /> : null}
+                 {isJoining ? "Entrando..." : "Entrar no Jogo"}
+              </motion.button>
+            </div>
+          ) : !showRoundResult && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

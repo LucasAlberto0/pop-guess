@@ -25,8 +25,8 @@ export async function POST(
       return NextResponse.json({ error: 'Room not found' }, { status: 404 })
     }
 
-    if (room.status !== 'waiting') {
-      return NextResponse.json({ error: 'Game already started' }, { status: 400 })
+    if (room.status === 'finished') {
+      return NextResponse.json({ error: 'Game already finished' }, { status: 400 })
     }
 
     const { data: existingPlayers } = await supabase
